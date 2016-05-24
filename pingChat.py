@@ -11,6 +11,8 @@ import os
 from Crypto.Cipher import AES
 
 ## Recommended that you change the listeningIP and the secret key used in the AES encryption...
+# If the message to encrypt and encode causes the sequence number to be greater that 65,535 the application will crash...
+# The receiving end is only meant to recieve 1 message at a time.  Multiple messages will not be able to be received at this time...
 
 # the block size for the cipher object; must be 16, 24, or 32 for AES
 BLOCK_SIZE = 32
@@ -20,8 +22,11 @@ BLOCK_SIZE = 32
 # used to ensure that your value is always a multiple of BLOCK_SIZE
 PADDING = '{'
 
+# one-liner to sufficiently pad the text to be encrypted
+pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
+
 # Random Secret Key used in the Encryption  - Recommended to change this each time
-# Needs to be the same size as the BLOCK_SIZE
+# Needs to be the same size as the BLOCK_SIZE and match on both sides of a conversation
 secret = "e4re3waq2ew34w3e4rdvgt6ytr45tgfd"
 
 # one-liners to encrypt/encode and decrypt/decode a string
@@ -31,6 +36,11 @@ DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(PADDING)
 
 # create a cipher object using the random secret
 cipher = AES.new(secret)
+
+# String that is used to detect the end of an encoded string.  This is necessary to tell the receiving end when the encoded message
+# has terminated so it at that time can decode, decrypt and display the message
+# The longer the string the better...
+endString = "y7y7Y7Y7purplechickens"
 
 listeningIP = "192.168.88.1"
 seqNumber = 1   # Sequence Number is Incremented every time a ping is sent...
@@ -96,8 +106,8 @@ def listenPing():
                 if str(srcIP) != listeningIP and icmpType != 0:
                     #print "SrcIP:" + str(srcIP) + " M:" + data[28:]
                     encodedMessage = encodedMessage + data[28:]
-                    if 'y7y7Y7Y7' in encodedMessage:
-                        encodedMessage = encodedMessage.replace('y7y7Y7Y7','')
+                    if endString in encodedMessage:
+                        encodedMessage = encodedMessage.replace(endString,'')
                         decodedMessage = DecodeAES(cipher, encodedMessage)
                         print "SrcIP:" + str(srcIP) + " M: " + decodedMessage
                         encodedMessage = ''
@@ -116,11 +126,16 @@ def sendPing(destIP, destMessage):
         print("This requires root privileges...")
         raise
     exitLoop = False
-    encodedMessage = EncodeAES(cipher, destMessage) + "y7y7Y7Y7"
+    # Encrypt and Encode the message unless it is the exit loop message...
+    if not destMessage == '99zz':
+        encodedMessage = EncodeAES(cipher, destMessage) + endString
+    else:
+        encodedMessage = destMessage
+    #print encodedMessage
     while exitLoop == False:
         if len(encodedMessage) > 64:
             currentMessage = encodedMessage[:63]
-            destMessage = encodedMessage[63:]
+            encodedMessage = encodedMessage[63:]
         else:
             currentMessage = encodedMessage
             exitLoop = True
@@ -133,6 +148,9 @@ def sendPing(destIP, destMessage):
         #icmpData = struct.pack("d", default_timer()) + icmpData
         packetChecksum = calcChecksum(icmpHeader + icmpData)
         # Reconstruct the header with the correct checksum...
+        #print packetChecksum
+        #print packetID
+        #print seqNumber
         icmpHeader = struct.pack("!BBHHH", ICMP_ECHO, 0, packetChecksum, packetID, seqNumber)
         icmpPacket = icmpHeader + icmpData
         sentTime = default_timer()
