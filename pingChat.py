@@ -6,6 +6,31 @@ import struct
 import sys
 import array
 import threading
+import base64
+import os
+from Crypto.Cipher import AES
+
+## Recommended that you change the listeningIP and the secret key used in the AES encryption...
+
+# the block size for the cipher object; must be 16, 24, or 32 for AES
+BLOCK_SIZE = 32
+
+# the character used for padding--with a block cipher such as AES, the value
+# you encrypt must be a multiple of BLOCK_SIZE in length.  This character is
+# used to ensure that your value is always a multiple of BLOCK_SIZE
+PADDING = '{'
+
+# Random Secret Key used in the Encryption  - Recommended to change this each time
+# Needs to be the same size as the BLOCK_SIZE
+secret = "e4re3waq2ew34w3e4rdvgt6ytr45tgfd"
+
+# one-liners to encrypt/encode and decrypt/decode a string
+# encrypt with AES, encode with base64
+EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
+DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(PADDING)
+
+# create a cipher object using the random secret
+cipher = AES.new(secret)
 
 listeningIP = "192.168.88.1"
 seqNumber = 1   # Sequence Number is Incremented every time a ping is sent...
@@ -13,9 +38,10 @@ ICMP_ECHOREPLY = 0		# Echo reply (per RFC792)
 ICMP_ECHO = 8			# Echo request (per RFC792)
 ICMP_MAX_RECV = 2048
 
-
+# Referenced the following locations and derived the following script...
 #https://gist.github.com/pklaus/856268
 #https://github.com/l4m3rx/python-ping/blob/master/ping.py
+#https://gist.github.com/sekondus/4322469
 
 def default_timer():
     if sys.platform == "win32":
@@ -48,6 +74,7 @@ def listenPing():
     counter = 0
     s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
     s.bind((listeningIP, 1))
+    encodedMessage = ''
     while True:
         try:
             data = s.recv(1024)
@@ -67,7 +94,13 @@ def listenPing():
                 break
             else:
                 if str(srcIP) != listeningIP and icmpType != 0:
-                    print "SrcIP:" + str(srcIP) + " M:" + data[28:]
+                    #print "SrcIP:" + str(srcIP) + " M:" + data[28:]
+                    encodedMessage = encodedMessage + data[28:]
+                    if 'y7y7Y7Y7' in encodedMessage:
+                        encodedMessage = encodedMessage.replace('y7y7Y7Y7','')
+                        decodedMessage = DecodeAES(cipher, encodedMessage)
+                        print "SrcIP:" + str(srcIP) + " M: " + decodedMessage
+                        encodedMessage = ''
         except:
             print "\nUnable to listen for icmp packets...\n"
     s.close()
@@ -83,12 +116,13 @@ def sendPing(destIP, destMessage):
         print("This requires root privileges...")
         raise
     exitLoop = False
+    encodedMessage = EncodeAES(cipher, destMessage) + "y7y7Y7Y7"
     while exitLoop == False:
-        if len(destMessage) > 64:
-            currentMessage = destMessage[:63]
-            destMessage = destMessage[63:]
+        if len(encodedMessage) > 64:
+            currentMessage = encodedMessage[:63]
+            destMessage = encodedMessage[63:]
         else:
-            currentMessage = destMessage
+            currentMessage = encodedMessage
             exitLoop = True
         randomInt = randint(0,30000)
         packetID = (13927 ^ randomInt) & 0xFFFF
