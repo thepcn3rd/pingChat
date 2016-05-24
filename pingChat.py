@@ -7,12 +7,14 @@ import sys
 import array
 import threading
 import base64
-import os
 from Crypto.Cipher import AES
 
 ## Recommended that you change the listeningIP and the secret key used in the AES encryption...
 # If the message to encrypt and encode causes the sequence number to be greater that 65,535 the application will crash...
 # The receiving end is only meant to recieve 1 message at a time.  Multiple messages will not be able to be received at this time...
+
+# Also on Windows you need the Microsoft Visual C++ Compiler for Python 2.7 installed with the pycrypto libraries...
+# My solution was to rename the folder from ..Lib\site-packages\crypto to ..Lib\site-packages\Crypto. The lower case "c" was causing the import error.
 
 # the block size for the cipher object; must be 16, 24, or 32 for AES
 BLOCK_SIZE = 32
