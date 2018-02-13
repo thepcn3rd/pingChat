@@ -34,7 +34,7 @@ def calcChecksum(source_string):
         source_string += "\x00"
     converted = array.array("H", source_string)
     if sys.byteorder == "big":
-        converted.bytewap()
+        converted.byteswap()
     val = sum(converted)
     val &= 0xffffffff # Truncate val to 32 bits (a variance from ping.c, which
                       # uses signed ints, but overflow is unlikely in ping)
